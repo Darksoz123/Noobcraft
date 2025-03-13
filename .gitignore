@@ -1,0 +1,6 @@
+# Ignore build folders
+/bin/
+/obj/
+
+#Ignore .jar files
+*.jar
