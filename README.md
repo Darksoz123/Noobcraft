@@ -4,7 +4,7 @@ This is the installer for Noobcraft 2, a Minecraft modpack.
 
 # Setting up the project
 
-### 1. Install .NET SDK
+### 1. Install .NET 8 SDK
 - [.NET SDK](https://dotnet.microsoft.com/download) (required to build the project)
 
 ### 2. Add your mods folder
