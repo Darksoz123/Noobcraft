@@ -12,6 +12,7 @@ class NoobCraft2
         Console.WriteLine("NoobCraft 2 Mods Installer \n");
 
         string minecraftModsFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), ".minecraft", "mods");
+        string minecraftConfigFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), ".minecraft", "config");
 
         if (!Directory.Exists(minecraftModsFolder))
         {
@@ -33,11 +34,16 @@ class NoobCraft2
             return;
         }
 
-        List<string> modNames;
+        ModList? modList;
         try
         {
-            var jsonData = JsonConvert.DeserializeObject<ModList>(jsonContent);
-            modNames = jsonData!.Mods;
+            modList = JsonConvert.DeserializeObject<ModList>(jsonContent);
+
+            if (modList == null)
+            {
+                Console.WriteLine("Failed to parse JSON file: Deserialization returned null.");
+                return;
+            }
         }
         catch (Exception ex)
         {
@@ -45,14 +51,17 @@ class NoobCraft2
             return;
         }
 
-        if (modNames.Count == 0)
+        if (modList.Mods.Count == 0 && modList.Configs.Count == 0)
         {
-            Console.WriteLine("No mods found in the JSON file.");
+            Console.WriteLine("No mods or configs found in the JSON file.");
             return;
         }
 
-        // Update/install mods
-        UpdateMods(minecraftModsFolder, modNames);
+        // Install/Update mods
+        UpdateMods(minecraftModsFolder, modList.Mods);
+
+        // Install/Update configs
+        UpdateConfigs(minecraftConfigFolder, modList.Configs);
 
         Console.WriteLine("Mods/Config installation complete. Press any key to exit.");
         Console.ReadKey();
@@ -161,6 +170,50 @@ class NoobCraft2
         }
     }
 
+    static void UpdateConfigs(string minecraftConfigFolder, List<string> configFiles)
+    {
+        // Check if the config folder exists
+        if (!Directory.Exists(minecraftConfigFolder))
+        {
+            Directory.CreateDirectory(minecraftConfigFolder);
+        }
+
+        // Install or update each config file
+        foreach (var configFile in configFiles)
+        {
+            try
+            {
+                // Replace forward slashes with dots for the embedded resource name
+                string configResourceName = $"installer.resources.{configFile.Replace('/', '.')}";
+                string configFilePath = Path.Combine(minecraftConfigFolder, configFile);
+
+                Console.WriteLine($"Installing/Updating config: {configFile}");
+
+                // Read the embedded config file and write it to the Minecraft config folder
+                byte[] configData = ReadEmbeddedResourceAsBytes(configResourceName) ?? [];
+                if (configData == null)
+                {
+                    Console.WriteLine($"Failed to read embedded config: {configFile}");
+                    continue;
+                }
+
+                // Ensure the directory structure exists
+                string configDirectory = Path.GetDirectoryName(configFilePath) ?? string.Empty;
+                if (!Directory.Exists(configDirectory))
+                {
+                    Directory.CreateDirectory(configDirectory);
+                }
+
+                File.WriteAllBytes(configFilePath, configData);
+                Console.WriteLine($"{configFile} installed/updated. \n");
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine($"Failed to install/update {configFile}: {e.Message}");
+            }
+        }
+    }
+
     static void CheckModsFolder(string folderPath)
     {
         try
@@ -240,4 +293,5 @@ class NoobCraft2
 public class ModList
 {
     public List<string> Mods { get; set; } = new();
+    public List<string> Configs { get; set; } = new();
 }

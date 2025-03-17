@@ -138,5 +138,12 @@
         "YungsBetterNetherFortresses-1.19.2-Forge-1.0.6.jar",
         "YungsBetterOceanMonuments-1.19.2-Forge-2.1.1.jar",
         "YungsBetterStrongholds-1.19.2-Forge-3.2.0.jar"
+    ],
+    "Configs": [
+        "config/jade/hide-blocks-1902.json",
+        "config/jade/hide-entities-1902.json",
+        "config/jade/jade.json",
+        "config/jade/plugins.json",
+        "config/jade/sort-order.json"
     ]
 }

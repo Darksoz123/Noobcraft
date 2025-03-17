@@ -9,6 +9,8 @@ This is the installer for Noobcraft 2, a Minecraft modpack.
 
 ### 2. Add your mods folder
 Before building the project, you need to add your 'mods' folder inside the 'resources' folder.
+If needed you can also add your own configurations, just add your config folder inside the 'resources' folder.
+Finally make sure to modify the 'mods.json' file with the names of the mods and configs.
 
 ### 3. Building the project
 Once the 'mods' folder is set up you can build the project:
