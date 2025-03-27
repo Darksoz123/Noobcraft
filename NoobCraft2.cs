@@ -1,4 +1,4 @@
-﻿using System.Reflection;
+using System.Reflection;
 using Newtonsoft.Json;
 
 namespace installer;
@@ -24,44 +24,11 @@ class NoobCraft2
 
         Console.WriteLine($"mods folder found at: {minecraftModsFolder}");
 
-        // Read the embedded JSON file
-        string jsonResourceName = "installer.resources.mods.json";
-        string jsonContent = ReadEmbeddedResource(jsonResourceName) ?? string.Empty;
-
-        if (string.IsNullOrEmpty(jsonContent))
-        {
-            Console.WriteLine("Failed to read embedded JSON file.");
-            return;
-        }
-
-        ModList? modList;
-        try
-        {
-            modList = JsonConvert.DeserializeObject<ModList>(jsonContent);
-
-            if (modList == null)
-            {
-                Console.WriteLine("Failed to parse JSON file: Deserialization returned null.");
-                return;
-            }
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Failed to parse JSON file: {ex.Message}");
-            return;
-        }
-
-        if (modList.Mods.Count == 0 && modList.Configs.Count == 0)
-        {
-            Console.WriteLine("No mods or configs found in the JSON file.");
-            return;
-        }
-
         // Install/Update mods
-        UpdateMods(minecraftModsFolder, modList.Mods);
+        UpdateMods(minecraftModsFolder);
 
         // Install/Update configs
-        UpdateConfigs(minecraftConfigFolder, modList.Configs);
+        UpdateConfigs(minecraftConfigFolder);
 
         Console.WriteLine("Mods/Config installation complete. Press any key to exit.");
         Console.ReadKey();
@@ -104,15 +71,12 @@ class NoobCraft2
         }
     }
 
-    static void UpdateMods(string modsFolder, List<string> modNames)
+    static void UpdateMods(string modsFolder)
     {
-        // Get the list of current mods in the folder
-        var currentMods = Directory.GetFiles(modsFolder)
-                                   .Select(Path.GetFileName)
-                                   .ToList();
+        var modList = GetModList(); 
 
         // Find mods to delete (mods that are not in the JSON list)
-        var modsToDelete = currentMods.Except(modNames).ToList();
+        var modsToDelete = modList.Mods.Except(modList.Mods).ToList();
 
         // Delete outdated or extra mods
         foreach (var modToDelete in modsToDelete)
@@ -130,7 +94,7 @@ class NoobCraft2
         }
 
         // Install or update mods from the JSON list
-        foreach (var modName in modNames)
+        foreach (var modName in modList.Mods)
         {
             try
             {
@@ -170,47 +134,66 @@ class NoobCraft2
         }
     }
 
-    static void UpdateConfigs(string minecraftConfigFolder, List<string> configFiles)
+    static void UpdateConfigs(string minecraftConfigFolder)
     {
-        // Check if the config folder exists
-        if (!Directory.Exists(minecraftConfigFolder))
-        {
-            Directory.CreateDirectory(minecraftConfigFolder);
-        }
+       var modList =  GetModList();
 
         // Install or update each config file
-        foreach (var configFile in configFiles)
+        foreach (var configFile in modList.Configs)
         {
             try
             {
-                // Replace forward slashes with dots for the embedded resource name
-                string configResourceName = $"installer.resources.{configFile.Replace('/', '.')}";
-                string configFilePath = Path.Combine(minecraftConfigFolder, configFile);
+                // Remove the "config/" prefix from the configFile path
+                string relativePath = configFile.StartsWith("config/") ? configFile.Substring("config/".Length) : configFile;
+    
+                // Construct the full path to the config file
+                string configFilePath = Path.Combine (minecraftConfigFolder, relativePath);
 
                 Console.WriteLine($"Installing/Updating config: {configFile}");
 
-                // Read the embedded config file and write it to the Minecraft config folder
-                byte[] configData = ReadEmbeddedResourceAsBytes(configResourceName) ?? [];
+                byte[] configData = ReadEmbeddedResourceAsBytes($"installer.resources.{configFile.Replace('/', '.')}") ?? [];
                 if (configData == null)
                 {
-                    Console.WriteLine($"Failed to read embedded config: {configFile}");
-                    continue;
+
+                    Console.WriteLine($"Failed to read embedded config: {configFile}"); continue;
+
                 }
 
-                // Ensure the directory structure exists
-                string configDirectory = Path.GetDirectoryName(configFilePath) ?? string.Empty;
+                string configDirectory = Path.GetDirectoryName (configFilePath) ?? string.Empty;
                 if (!Directory.Exists(configDirectory))
                 {
-                    Directory.CreateDirectory(configDirectory);
+                    Directory.CreateDirectory (configDirectory);
                 }
 
-                File.WriteAllBytes(configFilePath, configData);
-                Console.WriteLine($"{configFile} installed/updated. \n");
+                File.WriteAllBytes (configFilePath, configData);
+                Console.WriteLine($"{configFile} overwritten/updated. \n");
             }
             catch (Exception e)
             {
                 Console.WriteLine($"Failed to install/update {configFile}: {e.Message}");
             }
+        }    
+    }
+
+    static ModList GetModList()
+    {
+        string jsonResourceName = "installer.resources.mods.json";
+        string jsonContent = ReadEmbeddedResource(jsonResourceName) ?? string.Empty;
+
+        if (string.IsNullOrEmpty(jsonContent))
+        {
+            Console.WriteLine("Failed to read embedded JSON file.");
+            return new ModList();
+        }
+
+        try
+        {
+            return JsonConvert.DeserializeObject<ModList>(jsonContent) ?? new ModList();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Failed to parse JSON file: {ex.Message}");
+            return new ModList();
         }
     }
 
