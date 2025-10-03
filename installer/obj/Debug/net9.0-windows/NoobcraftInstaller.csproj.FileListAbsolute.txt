@@ -1,0 +1,14 @@
+C:\projects\Noobcraft\installer\bin\Debug\net9.0-windows\NoobcraftInstaller.exe
+C:\projects\Noobcraft\installer\bin\Debug\net9.0-windows\NoobcraftInstaller.deps.json
+C:\projects\Noobcraft\installer\bin\Debug\net9.0-windows\NoobcraftInstaller.runtimeconfig.json
+C:\projects\Noobcraft\installer\bin\Debug\net9.0-windows\NoobcraftInstaller.dll
+C:\projects\Noobcraft\installer\bin\Debug\net9.0-windows\NoobcraftInstaller.pdb
+C:\projects\Noobcraft\installer\obj\Debug\net9.0-windows\NoobcraftInstaller.GeneratedMSBuildEditorConfig.editorconfig
+C:\projects\Noobcraft\installer\obj\Debug\net9.0-windows\NoobcraftInstaller.AssemblyInfoInputs.cache
+C:\projects\Noobcraft\installer\obj\Debug\net9.0-windows\NoobcraftInstaller.AssemblyInfo.cs
+C:\projects\Noobcraft\installer\obj\Debug\net9.0-windows\NoobcraftInstaller.csproj.CoreCompileInputs.cache
+C:\projects\Noobcraft\installer\obj\Debug\net9.0-windows\NoobcraftInstaller.dll
+C:\projects\Noobcraft\installer\obj\Debug\net9.0-windows\refint\NoobcraftInstaller.dll
+C:\projects\Noobcraft\installer\obj\Debug\net9.0-windows\NoobcraftInstaller.pdb
+C:\projects\Noobcraft\installer\obj\Debug\net9.0-windows\NoobcraftInstaller.genruntimeconfig.cache
+C:\projects\Noobcraft\installer\obj\Debug\net9.0-windows\ref\NoobcraftInstaller.dll
