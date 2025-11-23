@@ -20,7 +20,7 @@ class NoobCraft2
             return;
         }
 
-        CheckModsFolder(minecraftModsFolder);
+        //CheckModsFolder(minecraftModsFolder);
 
         Console.WriteLine($"mods folder found at: {minecraftModsFolder}");
 
@@ -249,7 +249,7 @@ class NoobCraft2
 
     static void CopyDirectory(string sourceDir, string destinationDir)
     {
-        // Creathe the destination if it doesn't exist
+        // Create the destination if it doesn't exist
         if (!Directory.Exists(destinationDir))
         {
             Directory.CreateDirectory(destinationDir);
