@@ -1,5 +1,5 @@
 using System.Reflection;
-using Newtonsoft.Json;
+using System.Text.Json;
 
 namespace installer;
 
@@ -7,22 +7,27 @@ class NoobCraft2
 {
     static void Main(string[] args)
     {
-        Console.Title = "NoobCraft 2 Installer";
+        Console.Title = "NoobCraft Installer";
 
-        Console.WriteLine("NoobCraft 2 Mods Installer \n");
+        Console.ForegroundColor = ConsoleColor.Magenta;
+        Console.WriteLine("NoobCraft - Una Navidad En Peligro\n");
+        Console.ResetColor();
 
-        string minecraftModsFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), ".minecraft", "mods");
-        string minecraftConfigFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), ".minecraft", "config");
+        string baseFolder = GetMinecraftBaseFolder();
+        string minecraftModsFolder = Path.Combine(baseFolder, "mods");
+        string minecraftConfigFolder = Path.Combine(baseFolder, "config");
 
         if (!Directory.Exists(minecraftModsFolder))
         {
-            Console.WriteLine("Minecraft mods folder not found. Make sure Minecraft is installed.");
+            Console.ForegroundColor = ConsoleColor.Yellow;
+            Console.WriteLine("[WARNING] Minecraft mods folder not found. Make sure Minecraft is installed.");
+            Console.ResetColor();
             return;
         }
 
-        //CheckModsFolder(minecraftModsFolder);
-
-        Console.WriteLine($"mods folder found at: {minecraftModsFolder}");
+        Console.ForegroundColor = ConsoleColor.Green;
+        Console.WriteLine($"[INFO] Target Minecraft folder: {baseFolder}");
+        Console.ResetColor();
 
         // Install/Update mods
         UpdateMods(minecraftModsFolder);
@@ -31,65 +36,62 @@ class NoobCraft2
         UpdateConfigs(minecraftConfigFolder);
 
         Console.WriteLine("Mods/Config installation complete. Press any key to exit.");
-        Console.ReadKey();
+        Console.Read();
     }
 
-    // Helper method to read an embedded resource as a string
-    static string? ReadEmbeddedResource(string resourceName)
+    // Get the default Minecraft base folder based on OS
+    static string GetMinecraftBaseFolder()
     {
-        var assembly = Assembly.GetExecutingAssembly();
-        using (var stream = assembly.GetManifestResourceStream(resourceName))
+        string userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+
+        if (OperatingSystem.IsWindows())
         {
-            if (stream == null)
-            {
-                Console.WriteLine($"Resource not found: {resourceName}");
-                return null;
-            }
-            using (var reader = new StreamReader(stream))
-            {
-                return reader.ReadToEnd();
-            }
+            return Path.Combine(userProfile, "AppData", "Roaming", ".minecraft");
         }
-    }
-
-    // Helper method to read an embedded resource as a byte array
-    static byte[]? ReadEmbeddedResourceAsBytes(string resourceName)
-    {
-        var assembly = Assembly.GetExecutingAssembly();
-        using (var stream = assembly.GetManifestResourceStream(resourceName))
+        else if (OperatingSystem.IsMacOS())
         {
-            if (stream == null)
-            {
-                Console.WriteLine($"Resource not found: {resourceName}");
-                return null;
-            }
-            using (var memoryStream = new MemoryStream())
-            {
-                stream.CopyTo(memoryStream);
-                return memoryStream.ToArray();
-            }
+            return Path.Combine(userProfile, "Library", "Application Support", "minecraft");
+        }
+        else // Linux
+        {
+            return Path.Combine(userProfile, ".minecraft");
         }
     }
 
     static void UpdateMods(string modsFolder)
     {
-        var modList = GetModList(); 
+        var modList = GetModList();
+        if (modList.Mods.Count == 0) return;
 
-        // Find mods to delete (mods that are not in the JSON list)
-        var modsToDelete = modList.Mods.Except(modList.Mods).ToList();
+        // --- FIX: Actual Deletion Logic ---
+        // 1. Get all .jar files currently in the folder
+        var currentFiles = Directory.GetFiles(modsFolder, "*.jar")
+                                    .Select(Path.GetFileName)
+                                    .Where(x => x != null)
+                                    .Cast<string>()
+                                    .ToList();
 
-        // Delete outdated or extra mods
+        // 2. Identify files in the folder that are NOT in our JSON list
+        // We use StringComparer.OrdinalIgnoreCase to avoid casing issues
+        var modsToDelete = currentFiles
+            .Except(modList.Mods, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
         foreach (var modToDelete in modsToDelete)
         {
             try
             {
-                string modFilePath = Path.Combine(modsFolder, modToDelete ?? string.Empty);
+                string modFilePath = Path.Combine(modsFolder, modToDelete);
                 File.Delete(modFilePath);
-                Console.WriteLine($"Deleted outdated/extra mod: {modToDelete}");
+                Console.ForegroundColor = ConsoleColor.Yellow;
+                Console.WriteLine($"[DELETE] Outdated/Extra mod: {modToDelete}");
+                Console.ResetColor();
             }
             catch (Exception e)
             {
-                Console.WriteLine($"Failed to delete {modToDelete}: {e.Message}");
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine($"[ERROR] Failed to delete {modToDelete}: {e.Message}");
+                Console.ResetColor();
             }
         }
 
@@ -101,149 +103,150 @@ class NoobCraft2
                 string modResourceName = $"installer.resources.mods.{modName}";
                 string modFilePath = Path.Combine(modsFolder, modName);
 
-                // Check if the mod already exists and is up-to-date
+                using var resourceStream = GetResourceStream(modResourceName);
+                if (resourceStream == null) continue;
+
+                // Check if update is needed using Streams (Memory Efficient)
+                bool needsUpdate = true;
                 if (File.Exists(modFilePath))
                 {
-                    byte[] existingModData = File.ReadAllBytes(modFilePath);
-                    byte[] newModData = ReadEmbeddedResourceAsBytes(modResourceName) ?? [];
-
-                    if (existingModData.SequenceEqual(newModData))
+                    using var fileStream = File.OpenRead(modFilePath);
+                    if (StreamsAreEqual(resourceStream, fileStream))
                     {
-                        Console.WriteLine($"Mod is up-to-date: {modName}");
-                        continue;
+                        needsUpdate = false;
+                        Console.ForegroundColor = ConsoleColor.DarkGray;
+                        Console.WriteLine($"[SKIP] Mod is Up-to-date: {modName}");
+                        Console.ResetColor();
                     }
                 }
 
-                Console.WriteLine($"Installing/Updating mod: {modName}");
-
-                // Read the embedded .jar file and write it to the Minecraft mods folder
-                byte[] modData = ReadEmbeddedResourceAsBytes(modResourceName) ?? [];
-                if (modData == null)
+                if (needsUpdate)
                 {
-                    Console.WriteLine($"Failed to read embedded mod: {modName}");
-                    continue;
-                }
+                    Console.ForegroundColor = ConsoleColor.Cyan;
+                    Console.WriteLine($"[INSTALL] {modName}...");
+                    Console.ResetColor();
+                    
+                    // IMPORTANT: Reset resource stream position to 0 before copying
+                    // because StreamsAreEqual() moved the cursor to the end!
+                    resourceStream.Position = 0;
 
-                File.WriteAllBytes(modFilePath, modData);
-                Console.WriteLine($"{modName} installed/updated. \n");
+                    using var fileStream = File.Create(modFilePath);
+                    resourceStream.CopyTo(fileStream);
+                    
+                    Console.ForegroundColor = ConsoleColor.Green;
+                    Console.WriteLine($"[INFO] {modName} installed/updated. \n");
+                    Console.ResetColor();
+                }
             }
             catch (Exception e)
             {
-                Console.WriteLine($"Failed to install/update {modName}: {e.Message}");
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine($"[ERROR] Failed to install {modName}: {e.Message}");
+                Console.ResetColor();
             }
         }
     }
 
     static void UpdateConfigs(string minecraftConfigFolder)
     {
-       var modList =  GetModList();
+        var modList = GetModList();
 
-        // Install or update each config file
         foreach (var configFile in modList.Configs)
         {
             try
             {
-                // Remove the "config/" prefix from the configFile path
-                string relativePath = configFile.StartsWith("config/") ? configFile.Substring("config/".Length) : configFile;
-    
-                // Construct the full path to the config file
-                string configFilePath = Path.Combine (minecraftConfigFolder, relativePath);
+                string relativePath = configFile.Replace("config/", "").Replace("config\\", "");
+                string configFilePath = Path.Combine(minecraftConfigFolder, relativePath);
+                
+                // Replace slashes with dots for resource lookup
+                string resourceName = $"installer.resources.{configFile.Replace('/', '.').Replace('\\', '.')}";
+                
+                using var resourceStream = GetResourceStream(resourceName);
+                if (resourceStream == null) continue;
 
-                Console.WriteLine($"Installing/Updating config: {configFile}");
-
-                byte[] configData = ReadEmbeddedResourceAsBytes($"installer.resources.{configFile.Replace('/', '.')}") ?? [];
-                if (configData == null)
+                string? directory = Path.GetDirectoryName(configFilePath);
+                if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
                 {
-
-                    Console.WriteLine($"Failed to read embedded config: {configFile}"); continue;
-
+                    Directory.CreateDirectory(directory);
                 }
 
-                string configDirectory = Path.GetDirectoryName (configFilePath) ?? string.Empty;
-                if (!Directory.Exists(configDirectory))
-                {
-                    Directory.CreateDirectory (configDirectory);
-                }
+                Console.ForegroundColor = ConsoleColor.Cyan;
+                Console.WriteLine($"[CONFIG] Updating: {configFile}");
+                Console.ResetColor();
 
-                File.WriteAllBytes (configFilePath, configData);
-                Console.WriteLine($"{configFile} overwritten/updated. \n");
+                // Usually we force overwrite configs to ensure server compatibility
+                using var fileStream = File.Create(configFilePath);
+                resourceStream.CopyTo(fileStream);
             }
             catch (Exception e)
             {
-                Console.WriteLine($"Failed to install/update {configFile}: {e.Message}");
+                Console.ForegroundColor = ConsoleColor.Red;
+                Console.WriteLine($"[ERROR] Config {configFile}: {e.Message}");
+                Console.ResetColor();
             }
-        }    
+        }
     }
 
-    static ModList GetModList()
+    // Compares two streams byte-by-byte without loading entire files into RAM
+    static bool StreamsAreEqual(Stream source, Stream target)
+    {
+        if (source.Length != target.Length) return false;
+
+        int bufferSize = 4096;
+        byte[] buffer1 = new byte[bufferSize];
+        byte[] buffer2 = new byte[bufferSize];
+
+        while (true)
+        {
+            int count1 = source.Read(buffer1, 0, bufferSize);
+            int count2 = target.Read(buffer2, 0, bufferSize);
+
+            if (count1 != count2) return false; // Should not happen given Length check
+            if (count1 == 0) break; // End of stream
+
+            // Compare the bytes in the buffer
+            if (!buffer1.Take(count1).SequenceEqual(buffer2.Take(count2)))
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    static Stream? GetResourceStream(string resourceName)
+    {
+        var assembly = Assembly.GetExecutingAssembly();
+        var stream = assembly.GetManifestResourceStream(resourceName);
+
+        if (stream == null)
+        {
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.WriteLine($"[ERROR] Resource not found: {resourceName}");
+            Console.ResetColor();
+        }
+
+        return stream;
+    }
+    static FileList GetModList()
     {
         string jsonResourceName = "installer.resources.mods.json";
-        string jsonContent = ReadEmbeddedResource(jsonResourceName) ?? string.Empty;
 
-        if (string.IsNullOrEmpty(jsonContent))
-        {
-            Console.WriteLine("Failed to read embedded JSON file.");
-            return new ModList();
-        }
+        using var stream = GetResourceStream(jsonResourceName);
+        if (stream == null) return new FileList();
 
         try
         {
-            return JsonConvert.DeserializeObject<ModList>(jsonContent) ?? new ModList();
+            return JsonSerializer.Deserialize<FileList>(stream, new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            }) ?? new FileList();
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Failed to parse JSON file: {ex.Message}");
-            return new ModList();
-        }
-    }
-
-    static void CheckModsFolder(string folderPath)
-    {
-        try
-        {
-            // Check if the directory contains any files
-            if (Directory.GetFiles(folderPath).Length > 0 || Directory.GetDirectories(folderPath).Length > 0)
-            {
-                Console.WriteLine("The mods folder contains files or subdirectories.\n");
-                Console.WriteLine("Do you want to (1) create a backup and delete the folder, or (2) just delete the folder?");
-                Console.Write("Enter your choice (1 or 2): ");
-                string? choice = Console.ReadLine();
-
-                if (choice == "1")
-                {
-                    // Create a backup of the mods folder
-                    string backupFolderPath = Path.Combine(Path.GetDirectoryName(folderPath) ?? string.Empty, "mods_backup");
-
-                    if (Directory.Exists(backupFolderPath))
-                    {
-                        Console.WriteLine("Backup folder already exists. Deleting the old backup...");
-
-                        Directory.Delete(backupFolderPath, true);
-                    }
-
-                    Console.WriteLine("Creating a backup of the mods folder...");
-                    CopyDirectory(folderPath, backupFolderPath);
-                    Console.WriteLine($"Backup created at: {backupFolderPath}");
-                }
-                else if (choice != "2")
-                {
-                    Console.WriteLine("Invalid choice. No action taken.");
-                    return;
-                }
-
-                // Delete the folder and all its contents
-                Console.WriteLine("Deleting the mods folder...");
-                Directory.Delete(folderPath, true);
-
-                // Recreate the folder
-                Directory.CreateDirectory(folderPath);
-
-                Console.WriteLine("The mods folder has been deleted and recreated.\n");
-            }
-        }
-        catch (Exception e)
-        {
-            Console.WriteLine($"Error deleting the mods folder or file: {e.Message}");
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.WriteLine($"[ERROR] Failed to parse JSON file: {ex.Message}");
+            Console.ResetColor();
+            return new FileList();
         }
     }
 
@@ -273,7 +276,7 @@ class NoobCraft2
     }
 }
 
-public class ModList
+public class FileList
 {
     public List<string> Mods { get; set; } = new();
     public List<string> Configs { get; set; } = new();
